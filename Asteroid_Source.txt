@@ -1,0 +1,105 @@
+// Replace with your own keys
+const NASA_API_KEY = '6gUBCuaOLEW0t62PGKBZA5eXmEdPob8FZOjMJQGT'; // Replace with your NASA API key
+const MAPBOX_TOKEN = 'pk.eyJ1IjoicGFyaWNoYXlkZXk4IiwiYSI6ImNtZ2JnNG1maTBneWQya3F1N216eG91a2MifQ.ghYfXANzEpDJC4xJ3hnLhA'; // Replace with your Mapbox token
+
+mapboxgl.accessToken = MAPBOX_TOKEN;
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/dark-v11',
+  center: [0, 20],
+  zoom: 1.5
+});
+
+const infoDiv = document.getElementById('info');
+
+async function fetchAsteroids() {
+  // Get today's date and 7 days from now
+  const today = new Date();
+  const endDate = new Date();
+  endDate.setDate(today.getDate() + 7);
+
+  const formatDate = (date) => date.toISOString().split('T')[0];
+
+  const start_date = formatDate(today);
+  const end_date = formatDate(endDate);
+
+  const url = `https://api.nasa.gov/neo/rest/v1/feed?start_date=${start_date}&end_date=${end_date}&api_key=${NASA_API_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.near_earth_objects) {
+      displayAsteroids(data.near_earth_objects);
+    } else {
+      infoDiv.innerHTML = 'No asteroid data available.';
+    }
+  } catch (error) {
+    infoDiv.innerHTML = 'Error fetching asteroid data.';
+    console.error(error);
+  }
+}
+
+function displayAsteroids(neoData) {
+  infoDiv.innerHTML = '';
+
+  // Clear existing markers
+  if (window.markers) {
+    window.markers.forEach(marker => marker.remove());
+  }
+  window.markers = [];
+
+  // Loop through each date's asteroids
+  Object.keys(neoData).forEach(date => {
+    neoData[date].forEach(asteroid => {
+      const name = asteroid.name;
+      const diameterMin = asteroid.estimated_diameter.kilometers.estimated_diameter_min.toFixed(3);
+      const diameterMax = asteroid.estimated_diameter.kilometers.estimated_diameter_max.toFixed(3);
+      const hazardous = asteroid.is_potentially_hazardous_asteroid ? 'Yes' : 'No';
+
+      // We'll use the first close approach data for simplicity
+      const approachData = asteroid.close_approach_data[0];
+      const approachDate = approachData.close_approach_date;
+      const missDistanceKm = parseFloat(approachData.miss_distance.kilometers).toFixed(0);
+      const velocityKps = parseFloat(approachData.relative_velocity.kilometers_per_second).toFixed(2);
+
+      // NASA API does not provide exact impact coordinates, so we simulate a location based on approach orbit data
+      // We'll use the orbiting body (usually Earth) and randomize a location near the equator for demo purposes
+      // In real apps, more precise orbital mechanics calculations are needed.
+
+      // For demo: random lat/lon near equator
+      const lon = (Math.random() * 360) - 180;
+      const lat = (Math.random() * 60) - 30;
+
+      // Create marker on map
+      const marker = new mapboxgl.Marker({ color: hazardous === 'Yes' ? 'red' : 'green' })
+        .setLngLat([lon, lat])
+        .setPopup(new mapboxgl.Popup().setHTML(`
+          <strong>${name}</strong><br/>
+          Date: ${approachDate}<br/>
+          Diameter: ${diameterMin} - ${diameterMax} km<br/>
+          Hazardous: ${hazardous}<br/>
+          Miss Distance: ${missDistanceKm} km<br/>
+          Velocity: ${velocityKps} km/s
+        `))
+        .addTo(map);
+
+      window.markers.push(marker);
+
+      // Add to info panel
+      const asteroidDiv = document.createElement('div');
+      asteroidDiv.className = 'asteroid';
+      asteroidDiv.innerHTML = `
+        <strong>${name}</strong> (Approach: ${approachDate})<br/>
+        Diameter: ${diameterMin} - ${diameterMax} km<br/>
+        Hazardous: ${hazardous}<br/>
+        Miss Distance: ${missDistanceKm} km<br/>
+        Velocity: ${velocityKps} km/s
+      `;
+      infoDiv.appendChild(asteroidDiv);
+    });
+  });
+}
+
+fetchAsteroids();

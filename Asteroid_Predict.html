@@ -1,13 +1,11 @@
-<!doctype html> 
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Asteroid Impact Prediction — GeoJSON Polygon Impact (Clickable markers show details)</title>
 
-  <!-- Mapbox CSS -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
-
   <style>
     :root{
       --bg:#071021; --panel:#0d2330; --muted:#9fb6d0; --accent:#4fd1ff; --radius:12px;
@@ -26,13 +24,7 @@
     .panel h2{margin:0 0 8px 0;font-size:15px}
     .muted{color:var(--muted);font-size:13px}
     #info { margin-top:8px; display:flex; flex-direction:column; gap:8px; }
-    .detail {
-      background: linear-gradient(90deg, rgba(255,255,255,0.02), transparent);
-      border: 1px solid rgba(255,255,255,0.03);
-      padding: 10px;
-      border-radius: 10px;
-      margin-bottom: 8px;
-    }
+    .detail { background: linear-gradient(90deg, rgba(255,255,255,0.02), transparent); border: 1px solid rgba(255,255,255,0.03); padding: 10px; border-radius: 10px; margin-bottom: 8px; }
     .asteroid{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:10px;background:linear-gradient(90deg,rgba(255,255,255,0.01),transparent);border:1px solid rgba(255,255,255,0.02);transition:transform .12s,box-shadow .12s}
     .asteroid:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(0,0,0,0.55)}
     .badge{width:56px;height:56px;border-radius:10px;flex:0 0 56px;display:flex;align-items:center;justify-content:center;color:#021825;font-weight:700}
@@ -43,281 +35,278 @@
     .btn{background:rgba(255,255,255,0.03);color:var(--accent);border:1px solid rgba(255,255,255,0.03);padding:8px 10px;border-radius:8px;cursor:pointer;font-weight:600}
     .btn.ghost{background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.02)}
     .note{margin-top:10px;font-size:12px;color:var(--muted)}
-
-    /* Mapbox fixes */
     .mapboxgl-popup-content { color: #111 !important; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
     .mapboxgl-popup { z-index: 99999; }
     .mapboxgl-popup-tip { background: white !important; z-index: 99999; }
-
-    /* Ripple effect for markers */
-    .ripple {
-      position: absolute;
-      border-radius: 50%;
-      transform: scale(0);
-      animation: ripple 0.6s linear;
-      pointer-events: none;
-      background: rgba(255, 255, 255, 0.4);
-    }
-
-    @keyframes ripple {
-      to {
-        transform: scale(4);
-        opacity: 0;
-      }
-    }
+    .ripple { position: absolute; border-radius: 50%; transform: scale(0); animation: ripple 0.6s linear; pointer-events: none; background: rgba(255, 255, 255, 0.4); }
+    @keyframes ripple { to { transform: scale(4); opacity: 0; } }
   </style>
 </head>
 <body>
-  <header>
-    <div class="brand">
-      <div class="mark">AE</div>
-      <div>
-        <h1>Asteroid Impact Prediction</h1>
-        <div class="subtitle">Interactive visualization powered by NASA NEO data</div>
-      </div>
+<header>
+  <div class="brand">
+    <div class="mark">AE</div>
+    <div>
+      <h1>Asteroid Impact Prediction</h1>
+      <div class="subtitle">Interactive visualization powered by NASA NEO data</div>
     </div>
-    <div style="margin-left:auto;display:flex;gap:12px;align-items:center">
-      <button id="rotateToggle" class="btn">Start Rotation</button>
-      <button id="refreshBtn" class="btn ghost">Refresh Feed</button>
-    </div>
-  </header>
-
-  <div class="wrap">
-    <div id="map" aria-label="Globe map"></div>
-    <aside class="panel" aria-labelledby="panelTitle">
-      <h2 id="panelTitle">Upcoming Near-Earth Objects (7 days)</h2>
-      <div id="selected" class="detail" aria-live="polite" style="display:none;"></div>
-      <div id="info" aria-live="polite"></div>
-      <div class="note">Tip: click a list card or marker to simulate an impact. This tool is educational — not an emergency alert system.</div>
-    </aside>
   </div>
+  <div style="margin-left:auto;display:flex;gap:12px;align-items:center">
+    <button id="rotateToggle" class="btn">Start Rotation</button>
+    <button id="refreshBtn" class="btn ghost">Refresh Feed</button>
+    <button id="resetBtn" class="btn ghost">Reset Earth</button>
+  </div>
+</header>
 
-  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-  <script>
-    const NASA_API_KEY = '6gUBCuaOLEW0t62PGKBZA5eXmEdPob8FZOjMJQGT';
-    const MAPBOX_TOKEN = 'pk.eyJ1IjoicGFyaWNoYXlkZXk4IiwiYSI6ImNtZ2JnNG1maTBneWQya3F1N216eG91a2MifQ.ghYfXANzEpDJC4xJ3hnLhA';
-    mapboxgl.accessToken = MAPBOX_TOKEN;
+<div class="wrap">
+  <div id="map" aria-label="Globe map"></div>
+  <aside class="panel" aria-labelledby="panelTitle">
+    <h2 id="panelTitle">Upcoming Near-Earth Objects (7 days)</h2>
+    <div id="selected" class="detail" aria-live="polite" style="display:none;"></div>
+    <div id="info" aria-live="polite"></div>
+    <div class="note">Tip: click a list card or marker to simulate an impact. This tool is educational — not an emergency alert system.</div>
+  </aside>
+</div>
 
-    const map = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox/outdoors-v12',
-      center: [0, 0],
-      zoom: 1.2,
-      pitch: 0,
-      bearing: 0,
-      projection: 'globe'
-    });
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+<script>
+const NASA_API_KEY = '6gUBCuaOLEW0t62PGKBZA5eXmEdPob8FZOjMJQGT';
+const MAPBOX_TOKEN = 'pk.eyJ1IjoicGFyaWNoYXlkZXk4IiwiYSI6ImNtZ2JnNG1maTBneWQya3F1N216eG91a2MifQ.ghYfXANzEpDJC4xJ3hnLhA';
+mapboxgl.accessToken = MAPBOX_TOKEN;
 
-    let mapReady = false;
-    map.on('load', () => {
-      mapReady = true;
-      map.setFog({ color:'#000000', 'high-color':'#add8e6', 'horizon-blend':0.02, 'space-color':'#000000','star-intensity':0.0 });
-    });
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/outdoors-v12',
+  center: [0,0],
+  zoom: 1.2,
+  pitch: 23.5,
+  bearing: 0,
+  projection: 'globe'
+});
 
-    let isRotating = false;
-    let rotationFrame = null;
-    function rotateStep(){ 
-      if (!isRotating || !mapReady) { rotationFrame = requestAnimationFrame(rotateStep); return; } 
-      const curr = map.getBearing(); 
-      map.setBearing(curr - 0.18); 
-      rotationFrame = requestAnimationFrame(rotateStep); 
+let mapReady = false;
+map.on('load', () => {
+  mapReady = true;
+  map.setFog({ color:'#000000', 'high-color':'#add8e6', 'horizon-blend':0.02, 'space-color':'#000000','star-intensity':0.0 });
+});
+
+// ---------------- Realistic Earth Rotation ----------------
+let isRotating = false;
+let rotationFrame = null;
+let lastTime = performance.now();
+let rotationPaused = false;
+
+function rotateStep() {
+  if (!mapReady) { requestAnimationFrame(rotateStep); return; }
+  const now = performance.now();
+  const delta = (now - lastTime)/1000;
+  lastTime = now;
+
+  if (isRotating && !rotationPaused) {
+  const now = Date.now() / 1000;
+  const rotationSpeed = 0.4;
+
+  // Rotate east–west (Z-axis)
+  const currBearing = map.getBearing();
+  map.setBearing(currBearing + rotationSpeed);
+
+  // Oscillate pitch (X-axis)
+  // const pitch = 45 + 20 * Math.sin(now / 2);
+  const pitch = 23.5;
+  // console.log(pitch);
+  map.setPitch(pitch);
+}
+  rotationFrame = requestAnimationFrame(rotateStep);
+}
+
+document.getElementById('rotateToggle').addEventListener('click', () => {
+  isRotating = !isRotating;
+  document.getElementById('rotateToggle').textContent = isRotating ? 'Pause Rotation' : 'Start Rotation';
+  if (isRotating && !rotationFrame) {
+    lastTime = performance.now();
+    rotationFrame = requestAnimationFrame(rotateStep);
+  }
+});
+
+// ---------------- Reset Earth Button ----------------
+document.getElementById('resetBtn').addEventListener('click', () => {
+  rotationPaused = false;
+  map.flyTo({center:[0,0], zoom:1.2, bearing:0, pitch:23.5, speed:0.8, essential:true});
+});
+
+// ---------------- Utility Functions ----------------
+function hashStringToNumber(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function approachTimeToLongitude(approachDateStr) {
+  let ms = Date.parse(approachDateStr); if (Number.isNaN(ms)) ms = Date.now();
+  const d = new Date(ms);
+  const seconds = d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds() + d.getUTCMilliseconds()/1000;
+  const frac = (seconds % 86400)/86400;
+  return (frac*360)-180;
+}
+function nameHashToLatitude(name) { const h = hashStringToNumber((name||'')+'|lat'); const frac=h/0xFFFFFFFF; return (frac*120)-60; }
+function getApproachCoords(asteroid) {
+  const cad = (asteroid.close_approach_data && asteroid.close_approach_data[0]) || null;
+  const approachDate = cad && (cad.close_approach_date_full || cad.close_approach_date) || new Date().toISOString();
+  return [ approachTimeToLongitude(approachDate), nameHashToLatitude(asteroid.name||asteroid.id||approachDate) ];
+}
+
+// ---------------- Impact Polygon Animation ----------------
+function makeGeoJSONCircle(center, radiusMeters, points=64){
+  const [lon,lat]=center; const coords=[];
+  const R=6378137;
+  for(let i=0;i<points;i++){
+    const bearing = 2*Math.PI*(i/points);
+    const latRad = lat*Math.PI/180;
+    const lonRad = lon*Math.PI/180;
+    const angDist = radiusMeters/R;
+    const destLat = Math.asin(Math.sin(latRad)*Math.cos(angDist)+Math.cos(latRad)*Math.sin(angDist)*Math.cos(bearing));
+    const destLon = lonRad+Math.atan2(Math.sin(bearing)*Math.sin(angDist)*Math.cos(latRad),Math.cos(angDist)-Math.sin(latRad)*Math.sin(destLat));
+    coords.push([destLon*180/Math.PI,destLat*180/Math.PI]);
+  }
+  coords.push(coords[0]);
+  return { type:'Feature', geometry:{ type:'Polygon', coordinates:[coords] } };
+}
+
+function showImpactAnimationPolygon(centerLonLat,hazardous,avgDiameterKm){
+  if(!mapReady){console.warn('Map not ready'); return;}
+  rotationPaused = true;
+  const id = `impact-poly-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  const sourceId = `${id}-src`; const fillId = `${id}-fill`; const outlineId=`${id}-outline`;
+  const baseMeters=Math.max(1000,Math.min(800000,avgDiameterKm*1000*50));
+  const startFeature = makeGeoJSONCircle(centerLonLat,1,64);
+  map.addSource(sourceId,{type:'geojson',data:startFeature});
+  map.addLayer({id:fillId,type:'fill',source:sourceId,paint:{'fill-color':hazardous==='Yes'?'rgba(255,107,74,0.35)':'rgba(70,208,123,0.35)','fill-outline-color':hazardous==='Yes'?'rgba(255,107,74,0.7)':'rgba(70,208,123,0.7)'}});
+  map.addLayer({id:outlineId,type:'line',source:sourceId,paint:{'line-color':hazardous==='Yes'?'rgba(255,80,40,0.9)':'rgba(40,160,90,0.9)','line-width':2}});
+  const totalDuration = 1400; const start = performance.now();
+  function animate(now){
+    const t = Math.min(1,(now-start)/totalDuration);
+    const eased = 1-Math.pow(1-t,2);
+    const currentRadius=baseMeters*eased;
+    const feat = makeGeoJSONCircle(centerLonLat,currentRadius,128);
+    if(map.getSource(sourceId)) map.getSource(sourceId).setData(feat);
+    const fillOpacity=Math.max(0,0.9*(1-t));
+    if(map.getLayer(fillId)) map.setPaintProperty(fillId,'fill-color',hazardous==='Yes'?`rgba(255,107,74,${fillOpacity})`:`rgba(70,208,123,${fillOpacity})`);
+    if(t<1) requestAnimationFrame(animate);
+    else {
+      if(map.getLayer(outlineId)) map.removeLayer(outlineId);
+      if(map.getLayer(fillId)) map.removeLayer(fillId);
+      if(map.getSource(sourceId)) map.removeSource(sourceId);
+      rotationPaused=false;
     }
-    document.getElementById('rotateToggle').addEventListener('click', () => {
-      isRotating = !isRotating;
-      document.getElementById('rotateToggle').textContent = isRotating ? 'Pause Rotation' : 'Start Rotation';
-      if (isRotating) { rotationFrame = requestAnimationFrame(rotateStep); } 
-      else if (rotationFrame) { cancelAnimationFrame(rotationFrame); rotationFrame = null; }
-    });
+  }
+  requestAnimationFrame(animate);
+}
 
-    function hashStringToNumber(str) {
-      let h = 2166136261 >>> 0;
-      for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-      return h >>> 0;
-    }
-    function approachTimeToLongitude(approachDateStr) {
-      let ms = Date.parse(approachDateStr); if (Number.isNaN(ms)) ms = Date.now();
-      const d = new Date(ms);
-      const seconds = d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds() + d.getUTCMilliseconds()/1000;
-      const frac = (seconds % 86400) / 86400;
-      return (frac * 360) - 180;
-    }
-    function nameHashToLatitude(name) { const h = hashStringToNumber((name||'') + '|lat'); const frac = h / 0xFFFFFFFF; return (frac * 120) - 60; }
-    function getApproachCoords(asteroid) { const cad = (asteroid.close_approach_data && asteroid.close_approach_data[0]) || null; const approachDate = cad && (cad.close_approach_date_full || cad.close_approach_date) || new Date().toISOString(); return [ approachTimeToLongitude(approachDate), nameHashToLatitude(asteroid.name || asteroid.id || approachDate) ]; }
+// ---------------- Asteroid fetching & rendering ----------------
+function formatAsteroidDetails(obj){
+  const name=obj.name||'Unknown';
+  const diam=obj.estimated_diameter?.kilometers;
+  const diameterMin=diam?diam.estimated_diameter_min.toFixed(3):'N/A';
+  const diameterMax=diam?diam.estimated_diameter_max.toFixed(3):'N/A';
+  const avgDiameter=diam?((parseFloat(diameterMin)+parseFloat(diameterMax))/2).toFixed(3):'N/A';
+  const hazardous=obj.is_potentially_hazardous_asteroid?'Yes':'No';
+  const approachData=obj.close_approach_data?.[0]||{};
+  const approachDate=approachData.close_approach_date_full||approachData.close_approach_date||'N/A';
+  const missDistanceKm=approachData.miss_distance?parseFloat(approachData.miss_distance.kilometers).toFixed(0):'N/A';
+  const velocityKps=approachData.relative_velocity?parseFloat(approachData.relative_velocity.kilometers_per_second).toFixed(2):'N/A';
+  return `<strong>${name}</strong><br/>Date: ${approachDate}<br/>Diameter: ${diameterMin} - ${diameterMax} km (Avg: ${avgDiameter} km)<br/>Impact Radius Proxy: ~${avgDiameter!=='N/A'? (parseFloat(avgDiameter)/2).toFixed(3):'N/A'} km<br/>Hazardous: ${hazardous}<br/>Miss Distance: ${missDistanceKm} km<br/>Velocity: ${velocityKps} km/s`;
+}
 
-    function makeGeoJSONCircle(center, radiusMeters, points=64) {
-      const [lon, lat] = center;
-      const coords = [];
-      const R = 6378137;
-      for (let i = 0; i < points; i++) {
-        const bearing = 2 * Math.PI * (i / points);
-        const latRad = lat * Math.PI / 180;
-        const lonRad = lon * Math.PI / 180;
-        const angDist = radiusMeters / R;
-        const destLat = Math.asin(Math.sin(latRad) * Math.cos(angDist) + Math.cos(latRad) * Math.sin(angDist) * Math.cos(bearing));
-        const destLon = lonRad + Math.atan2(Math.sin(bearing) * Math.sin(angDist) * Math.cos(latRad), Math.cos(angDist) - Math.sin(latRad) * Math.sin(destLat));
-        coords.push([destLon * 180 / Math.PI, destLat * 180 / Math.PI]);
-      }
-      coords.push(coords[0]);
-      return { type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] } };
-    }
+function showSelectedAsteroid(obj){
+  const sel=document.getElementById('selected');
+  sel.innerHTML=formatAsteroidDetails(obj);
+  sel.style.display='block';
+  sel.scrollIntoView({behavior:'smooth',block:'start'});
+}
 
-    function showImpactAnimationPolygon(centerLonLat, hazardous, avgDiameterKm) {
-      if (!mapReady) { console.warn('Map not ready'); return; }
-      const id = `impact-poly-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-      const sourceId = `${id}-src`;
-      const fillId = `${id}-fill`;
-      const outlineId = `${id}-outline`;
-      const baseMeters = Math.max(1000, Math.min(800000, avgDiameterKm * 1000 * 50));
-      const startFeature = makeGeoJSONCircle(centerLonLat, 1, 64);
-      map.addSource(sourceId, { type: 'geojson', data: startFeature });
-      map.addLayer({ id: fillId, type: 'fill', source: sourceId, paint: { 'fill-color': hazardous === 'Yes' ? 'rgba(255,107,74,0.35)' : 'rgba(70,208,123,0.35)', 'fill-outline-color': hazardous === 'Yes' ? 'rgba(255,107,74,0.7)' : 'rgba(70,208,123,0.7)' } });
-      map.addLayer({ id: outlineId, type: 'line', source: sourceId, paint: { 'line-color': hazardous === 'Yes' ? 'rgba(255,80,40,0.9)' : 'rgba(40,160,90,0.9)', 'line-width': 2 } });
-      const totalDuration = 1400;
-      const start = performance.now();
-      function animate(now) {
-        const t = Math.min(1, (now - start) / totalDuration);
-        const eased = 1 - Math.pow(1 - t, 2);
-        const currentRadius = baseMeters * eased;
-        const feat = makeGeoJSONCircle(centerLonLat, currentRadius, 128);
-        if (map.getSource(sourceId)) map.getSource(sourceId).setData(feat);
-        const fillOpacity = Math.max(0, 0.9 * (1 - t));
-        if (map.getLayer(fillId)) map.setPaintProperty(fillId, 'fill-color', hazardous === 'Yes' ? `rgba(255,107,74,${fillOpacity})` : `rgba(70,208,123,${fillOpacity})`);
-        if (t < 1) requestAnimationFrame(animate); else { if (map.getLayer(outlineId)) map.removeLayer(outlineId); if (map.getLayer(fillId)) map.removeLayer(fillId); if (map.getSource(sourceId)) map.removeSource(sourceId); }
-      }
-      requestAnimationFrame(animate);
-    }
+window.markers=[];
+const infoDiv=document.getElementById('info');
 
-    function formatAsteroidDetails(obj) {
-      const name = obj.name || 'Unknown';
-      const diam = obj.estimated_diameter && obj.estimated_diameter.kilometers;
-      const diameterMin = diam ? diam.estimated_diameter_min.toFixed(3) : 'N/A';
-      const diameterMax = diam ? diam.estimated_diameter_max.toFixed(3) : 'N/A';
-      const avgDiameter = diam ? ((parseFloat(diameterMin) + parseFloat(diameterMax)) / 2).toFixed(3) : 'N/A';
-      const hazardous = obj.is_potentially_hazardous_asteroid ? 'Yes' : 'No';
-      const approachData = (obj.close_approach_data && obj.close_approach_data[0]) || {};
-      const approachDate = approachData && (approachData.close_approach_date_full || approachData.close_approach_date) || 'N/A';
-      const missDistanceKm = approachData && approachData.miss_distance ? parseFloat(approachData.miss_distance.kilometers).toFixed(0) : 'N/A';
-      const velocityKps = approachData && approachData.relative_velocity ? parseFloat(approachData.relative_velocity.kilometers_per_second).toFixed(2) : 'N/A';
+// ---------------- Fetch & Render ----------------
+async function fetchAsteroids(){
+  const refreshBtn = document.getElementById('refreshBtn');
+  refreshBtn.disabled = true;
+  const originalText = refreshBtn.textContent;
+  refreshBtn.textContent = 'Loading…';
+  infoDiv.innerHTML='<div class="muted">Loading…</div>';
+  try{
+    const today=new Date(); const endDate=new Date(); endDate.setDate(today.getDate()+7);
+    const fmt=d=>d.toISOString().split('T')[0];
+    const url=`https://api.nasa.gov/neo/rest/v1/feed?start_date=${fmt(today)}&end_date=${fmt(endDate)}&api_key=${NASA_API_KEY}`;
+    const res=await fetch(url); const data=await res.json();
+    if(!data?.near_earth_objects){ infoDiv.innerHTML='<div class="muted">No data</div>'; return; }
+    renderFeed(data.near_earth_objects);
+  } catch(err){ console.error(err); infoDiv.innerHTML='<div class="muted">Error loading data</div>'; }
+  finally{
+    refreshBtn.disabled = false;
+    refreshBtn.textContent = originalText;
+  }
+}
 
-      return `
-        <strong>${name}</strong><br/>
-        Date: ${approachDate}<br/>
-        Diameter: ${diameterMin} - ${diameterMax} km (Avg: ${avgDiameter} km)<br/>
-        Impact Radius Proxy: ~${(avgDiameter !== 'N/A' ? (parseFloat(avgDiameter)/2).toFixed(3) : 'N/A')} km<br/>
-        Hazardous: ${hazardous}<br/>
-        Miss Distance: ${missDistanceKm} km<br/>
-        Velocity: ${velocityKps} km/s
-      `;
-    }
+// ---------------- Render ----------------
+function renderFeed(feed){
+  infoDiv.innerHTML='';
+  if(window.markers){ window.markers.forEach(m=>m.remove()); window.markers=[]; }
+  const allAsteroids=[];
+  Object.keys(feed).forEach(day=>{
+    feed[day].forEach(obj=>{ allAsteroids.push(obj); });
+  });
+  // Sort descending by avg diameter
+  allAsteroids.sort((a,b)=>{
+    const avgA=(a.estimated_diameter.kilometers.estimated_diameter_min + a.estimated_diameter.kilometers.estimated_diameter_max)/2;
+    const avgB=(b.estimated_diameter.kilometers.estimated_diameter_min + b.estimated_diameter.kilometers.estimated_diameter_max)/2;
+    return avgB-avgA;
+  });
+  allAsteroids.forEach(obj=>{
+    const name=obj.name;
+    const diam=obj.estimated_diameter.kilometers;
+    const minD=Number(diam.estimated_diameter_min);
+    const maxD=Number(diam.estimated_diameter_max);
+    const avg=((minD+maxD)/2);
+    const hazardous=obj.is_potentially_hazardous_asteroid?'Yes':'No';
+    const approach=obj.close_approach_data?.[0]||{};
+    const date=approach.close_approach_date||'N/A';
+    const missKm=approach.miss_distance?Number(approach.miss_distance.kilometers).toFixed(0):'N/A';
+    const vel=approach.relative_velocity?Number(approach.relative_velocity.kilometers_per_second).toFixed(2):'N/A';
+    const [lon,lat]=getApproachCoords(obj);
 
-    function showSelectedAsteroid(obj) {
-      const sel = document.getElementById('selected');
-      sel.innerHTML = formatAsteroidDetails(obj);
-      sel.style.display = 'block';
-      sel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    const card=document.createElement('div'); card.className='asteroid';
+    const badge=document.createElement('div'); badge.className='badge';
+    badge.style.background=hazardous==='Yes'?'linear-gradient(180deg,#ff8b6a,#ff6b4a)':'linear-gradient(180deg,#7ef6b6,#48d07b)';
+    badge.textContent=Math.round(avg*10)/10+'km';
+    const meta=document.createElement('div'); meta.className='meta';
+    meta.innerHTML=`<strong>${name}</strong><div class="line">Date: ${date}<br/>Diameter: ${minD.toFixed(3)} - ${maxD.toFixed(3)} km (Avg: ${avg.toFixed(3)} km)<br/>Hazardous: ${hazardous}<br/>Miss Distance: ${missKm} km<br/>Velocity: ${vel} km/s</div>`;
+    card.appendChild(badge); card.appendChild(meta);
+    infoDiv.appendChild(card);
 
-    window.markers = [];
-    const infoDiv = document.getElementById('info');
+    card.addEventListener('click',()=>{ showSelectedAsteroid(obj); flyToAsteroid([lon,lat]); showImpactAnimationPolygon([lon,lat],hazardous,avg); });
 
-    async function fetchAsteroids() {
-      infoDiv.innerHTML = '<div class="muted">Loading…</div>';
-      try {
-        const today = new Date(); const endDate = new Date(); endDate.setDate(today.getDate()+7);
-        const fmt = d => d.toISOString().split('T')[0];
-        const url = `https://api.nasa.gov/neo/rest/v1/feed?start_date=${fmt(today)}&end_date=${fmt(endDate)}&api_key=${NASA_API_KEY}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (!data || !data.near_earth_objects) { infoDiv.innerHTML = '<div class="muted">No data</div>'; return; }
-        renderFeed(data.near_earth_objects);
-      } catch (err) {
-        console.error(err); infoDiv.innerHTML = '<div class="muted">Error loading data</div>';
-      }
-    }
+    const el=document.createElement('div'); el.className='marker';
+    el.style.width='14px'; el.style.height='14px'; el.style.borderRadius='50%';
+    el.style.background=hazardous==='Yes'?'#ff4f2f':'#46d07b';
+    el.style.cursor='pointer';
+    const marker=new mapboxgl.Marker(el).setLngLat([lon,lat]).addTo(map);
+    el.addEventListener('click',()=>{ showSelectedAsteroid(obj); flyToAsteroid([lon,lat]); showImpactAnimationPolygon([lon,lat],hazardous,avg); });
+    window.markers.push(marker);
+  });
+}
 
-    function renderFeed(feed) {
-      infoDiv.innerHTML = '';
-      if (window.markers) { window.markers.forEach(m => m.remove()); window.markers = []; }
-      const days = Object.keys(feed).sort();
-      days.forEach(day => {
-        feed[day].forEach(obj => {
-          const name = obj.name;
-          const diam = obj.estimated_diameter.kilometers;
-          const minD = Number(diam.estimated_diameter_min);
-          const maxD = Number(diam.estimated_diameter_max);
-          const avg = ((minD + maxD) / 2);
-          const hazardous = obj.is_potentially_hazardous_asteroid ? 'Yes' : 'No';
-          const approach = (obj.close_approach_data && obj.close_approach_data[0]) || {};
-          const date = approach.close_approach_date || day;
-          const missKm = approach.miss_distance ? Number(approach.miss_distance.kilometers).toFixed(0) : 'N/A';
-          const vel = approach.relative_velocity ? Number(approach.relative_velocity.kilometers_per_second).toFixed(2) : 'N/A';
-          const [lon, lat] = getApproachCoords(obj);
+function flyToAsteroid(lngLat){
+  rotationPaused=true;
+  map.flyTo({center:lngLat,zoom:5,speed:0.8,essential:true,curve:1.5,easing:t=>t,complete:()=>{setTimeout(()=>rotationPaused=false,1200);} });
+}
 
-          const card = document.createElement('div'); card.className = 'asteroid';
-          const badge = document.createElement('div'); badge.className = 'badge';
-          badge.style.background = hazardous === 'Yes' ? 'linear-gradient(180deg,#ff8b6a,#ff6b4a)' : 'linear-gradient(180deg,#7ef6b6,#48d07b)';
-          badge.textContent = Math.round(avg*10)/10 + 'km';
-          const meta = document.createElement('div'); meta.className = 'meta';
-          meta.innerHTML = `<strong>${name}</strong><div class="line">${date} • v ${vel} km/s • miss ${missKm} km</div>`;
-          card.dataset.lon = lon; card.dataset.lat = lat; card.dataset.avg = avg; card.dataset.hazardous = hazardous;
-          card.appendChild(badge); card.appendChild(meta);
-          card.addEventListener('click', () => {
-            const lonC = Number(card.dataset.lon), latC = Number(card.dataset.lat);
-            map.flyTo({ center: [lonC, latC], zoom: 3.8, speed: 0.8 });
-            showImpactAnimationPolygon([lonC, latC], card.dataset.hazardous, Number(card.dataset.avg));
-            showSelectedAsteroid(obj);
-          });
-          infoDiv.appendChild(card);
+// ---------------- Refresh button ----------------
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  fetchAsteroids();
+});
 
-          const el = document.createElement('div');
-          const size = Math.min(44, Math.max(14, avg * 14));
-          el.style.width = `${size}px`;
-          el.style.height = `${size}px`;
-          el.style.borderRadius = '50%';
-          el.style.boxShadow = '0 8px 18px rgba(0,0,0,0.45)';
-          el.style.border = '2px solid rgba(255,255,255,0.06)';
-          el.style.background = hazardous === 'Yes' ? 'radial-gradient(circle,#ff8b6a,#ff6b4a)' : 'radial-gradient(circle,#7ef6b6,#48d07b)';
-          el.style.cursor = 'pointer';
-
-          const popup = new mapboxgl.Popup({ offset: 10 }).setHTML(`
-            <div style="min-width:220px; color:#111;">
-              <strong>${name}</strong><br/>
-              Date: ${date}<br/>
-              Diameter: ${minD.toFixed(3)}–${maxD.toFixed(3)} km<br/>
-              Hazardous: ${hazardous ? 'Yes' : 'No'}<br/>
-              Miss distance: ${missKm} km<br/>
-              Velocity: ${vel} km/s<br/>
-              <div style="margin-top:6px"><em>Click marker to animate impact</em></div>
-            </div>
-          `);
-
-          const marker = new mapboxgl.Marker({ element: el }).setLngLat([lon, lat]).setPopup(popup).addTo(map);
-
-          el.addEventListener('click', (ev) => {
-            ev.stopPropagation();
-
-            // Ripple effect
-            const ripple = document.createElement('div');
-            ripple.className = 'ripple';
-            ripple.style.width = `${size}px`;
-            ripple.style.height = `${size}px`;
-            ripple.style.left = '0px';
-            ripple.style.top = '0px';
-            el.appendChild(ripple);
-            ripple.addEventListener('animationend', () => ripple.remove());
-
-            showImpactAnimationPolygon([lon, lat], hazardous, avg);
-            marker.togglePopup();
-            showSelectedAsteroid(obj);
-          });
-
-          window.markers.push(marker);
-        });
-      });
-    }
-
-    document.getElementById('refreshBtn').addEventListener('click', fetchAsteroids);
-    fetchAsteroids();
-  </script>
+// Initial fetch
+fetchAsteroids();
+</script>
 </body>
 </html>
